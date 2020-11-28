@@ -65,10 +65,14 @@ class AdminLogin(tk.Frame):
 		username = name.get()
 		password = pw.get()
 
-		sql = "select password from admin where name = '"+username+"'"
-		myCursor.execute(sql)
+		try:
+			sql = "select password from admin where name = '"+username+"'"
+			myCursor.execute(sql)
+		except:
+			tk.messagebox.showerror(title = 'Error', message = "Error di tabel 'admin'")
+			return 0
+
 		res = myCursor.fetchone()
-		
 		if res is None:
 			print('login failed, username do not exist')
 			tk.messagebox.showerror(title = 'Error', message = 'Username do not exist')
