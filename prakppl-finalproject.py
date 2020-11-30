@@ -2,14 +2,15 @@ import tkinter as tk
 from tkinter import messagebox
 import mysql.connector
 
-#koneksi database, ganti 'testing' menjadi nama database
+#koneksi database, nama database di parameter 'database'
 
 try:
-	mydb = mysql.connector.connect(host='localhost', user='root', passwd='', database='testing')
+	mydb = mysql.connector.connect(host='localhost', user='root', passwd='', database='database_prakppl')
 	myCursor = mydb.cursor()
 except:
 	tk.messagebox.showerror(title = 'Error', message = 'Database Tidak Ditemukan')
 
+#class utama, dipanggil untuk memanggil windowsnya
 class MainApp(tk.Tk):
 	def __init__(self):
 		tk.Tk.__init__(self)
@@ -18,6 +19,7 @@ class MainApp(tk.Tk):
 		self.geometry("640x480")
 		self.switchFrame(HomePage)
 
+	#function untuk mengganti frame
 	def switchFrame(self,frameClass):
 		newFrame = frameClass(self)
 		if self._frame is not None:
@@ -43,6 +45,7 @@ class AdminLogin(tk.Frame):
 		tk.Frame.__init__(self, master, bg = '#1E822A')
 		self.pack(side = 'top', expand = 1, fill = 'both')
 
+		cur_admin = ''
 		inName = tk.StringVar(master)
 		inPw = tk.StringVar(master)
 
@@ -55,7 +58,7 @@ class AdminLogin(tk.Frame):
 		e2 = tk.Entry(self, textvariable = inPw)
 		e2.pack(side = 'top')
 
-		log_button = tk.Button(self, text = 'LOG IN', command = lambda: self.confirmAdmin(master,inName,inPw)) 
+		log_button = tk.Button(self, text = 'LOG IN', bg = "#287624", font = ('verdana', 16), command = lambda: self.confirmAdmin(master,inName,inPw)) 
 		log_button.pack()
 
 		back_btn = tk.Button(self, text = "Back to Home Page", bg = "#75fa6e", font = ('verdana', 16), command = lambda: master.switchFrame(HomePage))
@@ -66,7 +69,7 @@ class AdminLogin(tk.Frame):
 		password = pw.get()
 
 		try:
-			sql = "select password from admin where name = '"+username+"'"
+			sql = "select password from admin where nama = '"+username+"'"
 			myCursor.execute(sql)
 		except:
 			tk.messagebox.showerror(title = 'Error', message = "Error di tabel 'admin'")
@@ -81,6 +84,8 @@ class AdminLogin(tk.Frame):
 			for i in res:
 				if(i == password):
 					print('login successful')
+					global cur_admin
+					cur_admin = username
 					master.switchFrame(AdminWindow)
 				else:
 					print('login failed, wrong pasword')
@@ -110,8 +115,15 @@ class FeedbackWindow(tk.Frame):
 		## TO DO SHOW FEEDBACK
 
 		fb = tk.Text(self, height = 20, width = 60)
+		
+		sql = "select judul, keterangan from feedback"
+		myCursor.execute(sql)
+		res = myCursor.fetchall()
 
-		fb.insert(tk.END, "FEEDBACK HERE\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\ntest")
+		for i in range(len(res)):
+			fb.insert(tk.END, "Judul: "+res[i][0]+"\n")
+			fb.insert(tk.END, "Keterangan: "+res[i][1]+"\n\n")
+
 		fb.config(state = 'disabled')
 		fb.pack()
 
@@ -130,11 +142,9 @@ class AddPost(tk.Frame):
 		intype = tk.StringVar()
 
 		tk.Label(self, text = "Nama", bg = "#55f24b", font = ('verdana', 18)).pack()
-		e1 = tk.Entry(self, textvariable = injudul, width = 40)
-		e1.pack()
-		tk.Label(self, text = "Tipe Informasi (1: Makanan, 2: Olahraga)", bg = "#55f24b", font = ('verdana', 18)).pack()
-		e2 = tk.Entry(self, textvariable = intype, width = 20)
-		e2.pack()
+		e1 = tk.Entry(self, textvariable = injudul, width = 40).pack()
+		tk.Label(self, text = "Tipe Informasi (0: Makanan, 1: Olahraga)", bg = "#55f24b", font = ('verdana', 18)).pack()
+		e2 = tk.Entry(self, textvariable = intype, width = 20).pack()
 		tk.Label(self, text = "Deskripsi", bg = "#55f24b", font = ('verdana', 18)).pack()
 
 		desc = tk.Text(self, height = 10, width = 60)
@@ -151,10 +161,30 @@ class AddPost(tk.Frame):
 
 	def submitPost(self, injudul, text, intype):
 		judul = injudul.get()
-		postType = int(intype.get())
+		postType = intype.get()
 		desc = text.get("1.0","end-1c")
-		print(judul,desc,postType)
-		## TO DO KIRIM FEEDBACK KE DATABASE
+		if(judul == '' or postType == '' or desc == ''):
+			tk.messagebox.showerror(title = 'Error', message = "Entry Kosong")
+			return 0
+		if(int(postType) != 0 and int(postType) != 1):
+			print(postType)
+			tk.messagebox.showerror(title = 'Error', message = "Tipe Post Salah")
+			return 0
+		try:
+			sql = "select curdate()"
+			myCursor.execute(sql)
+			res = myCursor.fetchone()
+			cur_date = "{}".format(*res)
+			#print(cur_date)
+			insert_sql = "insert into posting(judul,type,isi,tanggal,admin) values (%s,%s,%s,%s,%s)"
+			val = (judul, postType, desc, cur_date, cur_admin)
+			#print(insert_sql)
+			myCursor.execute(insert_sql,val)
+			mydb.commit()
+			tk.messagebox.showinfo(title = 'Berhasil', message = "Insert Post Berhasil")
+		except:
+			tk.messagebox.showerror(title = 'Error', message = "Error di tabel 'Posting'")
+			return 0
 
 class EditPost(tk.Frame):
 	def __init__(self, master):
@@ -165,28 +195,19 @@ class EditPost(tk.Frame):
 		injudul = tk.StringVar()
 		intype = tk.StringVar()
 
-		l1 = tk.Label(self, text = "Judul Post", bg = "#55f24b", font = ('verdana', 18))
-		l1.pack(side = 'top', expand = 0, fill = tk.BOTH)
-		e1 = tk.Entry(self, textvariable = inkeyword, width = 40)
-		e1.pack()
-
-		l2 = tk.Label(self, text = "Judul Baru", bg = "#55f24b", font = ('verdana', 18))
-		l2.pack(side = 'top', expand = 0, fill = tk.BOTH)
-		e2 = tk.Entry(self, textvariable = inkeyword, width = 40)
-		e2.pack()
-
-		l3 = tk.Label(self, text = "Tipe Informasi (1: Makanan, 2: Olahraga)", bg = "#55f24b", font = ('verdana', 18))
-		l3.pack(side = 'top', expand = 0, fill = tk.BOTH)
-		e3 = tk.Entry(self, textvariable = intype, width = 20)
-		e3.pack()
-
-		l4 = tk.Label(self, text = "Deskripsi Baru", bg = "#55f24b", font = ('verdana', 18))
-		l4.pack(side = 'top', expand = 0, fill = tk.BOTH)
+		tk.Label(self, text = "Judul Post", bg = "#55f24b", font = ('verdana', 18)).pack()
+		e1 = tk.Entry(self, textvariable = inkeyword, width = 40).pack()
+		tk.Label(self, text = "Judul Baru", bg = "#55f24b", font = ('verdana', 18)).pack()
+		e2 = tk.Entry(self, textvariable = injudul, width = 40).pack()
+		tk.Label(self, text = "Tipe Informasi (0: Makanan, 1: Olahraga)", bg = "#55f24b", font = ('verdana', 18)).pack()
+		e3 = tk.Entry(self, textvariable = intype, width = 20).pack()
+		tk.Label(self, text = "Deskripsi Baru", bg = "#55f24b", font = ('verdana', 18)).pack()
+		
 		newdesc = tk.Text(self, height = 10, width = 60)
 		newdesc.pack()
 
-		log_button = tk.Button(self, text = 'Submit', command = self.editInfo())
-		log_button.pack()
+		submit_btn = tk.Button(self, text = 'Submit Changes', bg = "#75fa6e", font = ('verdana', 16), command = lambda: self.editInfo(inkeyword, injudul, newdesc, intype))
+		submit_btn.pack()
 
 		home_btn = tk.Button(self, text = "Back to Home Page", bg = "#75fa6e", font = ('verdana', 16), command = lambda: master.switchFrame(HomePage))
 		home_btn.pack(side = 'bottom', expand = 0, fill = tk.BOTH)
@@ -194,8 +215,28 @@ class EditPost(tk.Frame):
 		back_btn = tk.Button(self, text = "Back to Admin Page", bg = "#75fa6e", font = ('verdana', 16), command = lambda: master.switchFrame(AdminWindow))
 		back_btn.pack(side = 'bottom', expand = 0, fill = tk.BOTH)
 
-	def editInfo(self):
-		return 0
+	def editInfo(self, inkeyword, injudul, text, intype):
+		keyword = inkeyword.get()
+		judul = injudul.get()
+		postType = intype.get()
+		desc = text.get("1.0","end-1c")
+		if(judul == '' or postType == '' or desc == ''):
+			tk.messagebox.showerror(title = 'Error', message = "Entry Kosong")
+			return 0
+		if(int(postType) != 0 and int(postType) != 1):
+			print(postType)
+			tk.messagebox.showerror(title = 'Error', message = "Tipe Post Salah")
+			return 0
+		try:
+			insert_sql = "update posting set judul = %s, type = %s, isi = %s where judul = %s"
+			val = (judul, postType, desc, keyword)
+			#print(insert_sql)
+			myCursor.execute(insert_sql,val)
+			mydb.commit()
+			tk.messagebox.showinfo(title = 'Berhasil', message = "Edit Post Berhasil'")
+		except:
+			tk.messagebox.showerror(title = 'Error', message = "Error di tabel 'Posting'")
+			return 0
 
 class UserWindow(tk.Frame):
 	def __init__(self, master):
@@ -316,8 +357,21 @@ class GiveFeedback(tk.Frame):
 	def submitFeedback(self, injudul, text):
 		judul = injudul.get()
 		fb_text = text.get("1.0","end-1c")
-		print(judul,fb_text)
+		#print(judul,fb_text)
 		## TO DO KIRIM FEEDBACK KE DATABASE
+		if(judul == '' or fb_text == ''):
+			tk.messagebox.showerror(title = 'Error', message = "Entry Kosong")
+			return 0
+		try:
+			insert_sql = "insert into feedback(judul,keterangan) values (%s,%s)"
+			val = (judul, fb_text)
+			#print(insert_sql)
+			myCursor.execute(insert_sql,val)
+			mydb.commit()
+			tk.messagebox.showinfo(title = 'Berhasil', message = "Feedback berhasil dikirim")
+		except:
+			tk.messagebox.showerror(title = 'Error', message = "Error di tabel 'Posting'")
+			return 0
 
 def main():
 	checkDb = "mydb" in globals()
