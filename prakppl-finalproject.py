@@ -5,7 +5,7 @@ import mysql.connector
 #koneksi database, nama database di parameter 'database'
 
 try:
-	mydb = mysql.connector.connect(host='localhost', user='root', passwd='', database='database_prakppl')
+	mydb = mysql.connector.connect(host='localhost', user='root', passwd='', database='prakppl')
 	myCursor = mydb.cursor()
 except:
 	tk.messagebox.showerror(title = 'Error', message = 'Database Tidak Ditemukan')
